@@ -259,15 +259,7 @@ tuya:
               id(alarm2_undervoltage_threshold).publish_state((x[10] << 8) | x[11]);
             }
 
-    # # ============ ALARM SET 3 (DP 126) - Flow Loss ============
-    # - sensor_datapoint: 126
-    #   datapoint_type: raw
-    #   then:
-    #     - lambda: |-
-    #         if (x.size() >= 4) {
-    #           id(alarm3_lost_flow_enabled_state).publish_state(x[1]);
-    #           id(alarm3_lost_flow_threshold).publish_state((x[2] << 8) | x[3]);
-    #         }
+
 
 # ==================================================
 #                    SENSORS
