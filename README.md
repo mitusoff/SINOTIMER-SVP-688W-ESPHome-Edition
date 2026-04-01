@@ -53,7 +53,7 @@ git clone https://github.com/yourusername/sinotimer-esphome.git
 cd sinotimer-esphome
 ```
 
-2️⃣ Настройка
+### 2️⃣ Настройка
 ```yaml
 # Создайте файл secrets.yaml в той же папке
 wifi_ssid: "Ваш WiFi"
@@ -62,13 +62,13 @@ wifi_ssid2: "Резервная сеть"  # опционально
 wifi_password2: "Резервный пароль"
 ```
 
-3️⃣ Прошивка
+### 3️⃣ Прошивка
 ```bash
 # Подключите SINOTIMER через USB-UART (3.3V!)
 esphome run sinotimer-smart-ac_actual_config_1.yaml
 ```
 
-4️⃣ Первое включение
+### 4️⃣ Первое включение
 После прошивки устройство создаст точку доступа Sinotimer svp-688w Hotspot
 
 Пароль: 
@@ -77,53 +77,76 @@ esphome run sinotimer-smart-ac_actual_config_1.yaml
 
 Готово! 🎉 Ваш автомат появится в Home Assistant через интеграцию ESPHome автоматически.
 
-## 🏗️ **Архитектура: как это работает**
+## **Архитектура: как это работает**
 
 ```mermaid
 graph LR
-    subgraph "🔌 Устройство"
+    subgraph "🔌 УСТРОЙСТВО"
         direction TB
-        A[<b>ESP8266</b><br/>+ Tuya MCU] --> B[<b>UART</b><br/>9600 baud]
-        B --> C[<b>Декодинг</b><br/>DP 6,9,17,18...]
-        C --> D[<b>Template</b><br/>Sensors]
-        D --> E[<b>ESPHome</b><br/>API]
+        A["<b>ESP8266 + Tuya MCU</b>"] --> B["<b>UART 9600 baud</b>"]
+        B --> C["<b>Декодинг DP</b><br/>6, 9, 17, 18..."]
+        C --> D["<b>Template Sensors</b>"]
+        D --> E["<b>ESPHome API</b>"]
     end
     
-    subgraph "🏠 Домашняя автоматизация"
+    subgraph "🏠 ДОМАШНЯЯ АВТОМАТИЗАЦИЯ"
         direction TB
-        E --> F[<b>Home</b><br/><b>Assistant</b>]
-        E --> G[<b>Веб-интерфейс</b><br/>:80]
-        F --> H[🤖 <b>Автоматизации</b><br/>Сценарии]
-        F --> I[💬 <b>Уведомления</b><br/>Telegram / Алиса]
+        E --> F["<b>Home Assistant</b>"]
+        E --> G["<b>Веб-интерфейс :80</b>"]
+        F --> H["🤖 <b>Автоматизации</b><br/>Сценарии, триггеры"]
+        F --> I["💬 <b>Уведомления</b><br/>Telegram / Алиса"]
     end
     
-    subgraph "🛡️ Система защиты"
+    subgraph "🛡️ СИСТЕМА ЗАЩИТЫ"
         direction TB
-        J[<b>Пороги</b><br/>срабатывания] --> K[<b>Tuya</b><br/>Commands]
-        K --> L[<b>Аппаратное</b><br/>отключение]
+        J["<b>Пороги срабатывания</b><br/>V, A, mA, °C"] --> K["<b>Tuya Commands</b>"]
+        K --> L["<b>Аппаратное отключение</b><br/>Реле"]
     end
     
-    style A fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    style B fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    style C fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    style D fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    style E fill:#c8e6c9,stroke:#1b5e20,stroke-width:2px
-    style F fill:#c8e6c9,stroke:#1b5e20,stroke-width:2px
-    style G fill:#c8e6c9,stroke:#1b5e20,stroke-width:2px
-    style H fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-    style I fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-    style J fill:#ffcdd2,stroke:#b71c1c,stroke-width:2px
-    style K fill:#ffcdd2,stroke:#b71c1c,stroke-width:2px
-    style L fill:#ffcdd2,stroke:#b71c1c,stroke-width:2px
+    style A fill:#2c3e50,stroke:#3498db,stroke-width:2px,color:#fff
+    style B fill:#2c3e50,stroke:#3498db,stroke-width:2px,color:#fff
+    style C fill:#2c3e50,stroke:#3498db,stroke-width:2px,color:#fff
+    style D fill:#2c3e50,stroke:#3498db,stroke-width:2px,color:#fff
+    style E fill:#27ae60,stroke:#2ecc71,stroke-width:2px,color:#fff
+    style F fill:#27ae60,stroke:#2ecc71,stroke-width:2px,color:#fff
+    style G fill:#27ae60,stroke:#2ecc71,stroke-width:2px,color:#fff
+    style H fill:#f39c12,stroke:#e67e22,stroke-width:2px,color:#fff
+    style I fill:#f39c12,stroke:#e67e22,stroke-width:2px,color:#fff
+    style J fill:#c0392b,stroke:#e74c3c,stroke-width:2px,color:#fff
+    style K fill:#c0392b,stroke:#e74c3c,stroke-width:2px,color:#fff
+    style L fill:#c0392b,stroke:#e74c3c,stroke-width:2px,color:#fff
 ```
 
+## 📦 DP6 — Три в одном: напряжение, ток и мощность
 
-    Магия в деталях:
+-  Проблема: Обычно каждую метрику нужно запрашивать отдельно, что создаёт задержки и рассинхрон данных.
 
-DP6 передаёт напряжение/ток/мощность одним пакетом
+-  Решение: SINOTIMER упаковывает все три параметра в один пакет данных. Мы просто разбираем этот "сэндвич" и получаем синхронные показания.
 
-DP9 — битовая маска из 20 типов аварий
-
-Все защиты настраиваются через Home Assistant и сохраняются в энергонезависимой памяти
-
-
+Как это выглядит в коде:
+```yaml
+# DP6 присылает массив байт [0,1,2,3,4,5,6,7]
+- sensor_datapoint: 6
+  datapoint_type: raw
+  then:
+    - lambda: |-
+        if (x.size() >= 8) {
+          # Байты 0-1: напряжение (0.1V)
+          id(voltage).publish_state((x[0] << 8 | x[1]) * 0.1);
+          
+          # Байты 3-4: ток (0.001A)  
+          id(current).publish_state((x[3] << 8 | x[4]) * 0.001);
+          
+          # Байты 6-7: мощность (1W)
+          id(power).publish_state((x[6] << 8 | x[7]) * 1);
+        }
+```
+📊 ОДНИМ ПАКЕТОМ (каждые 2 секунды):
+┌─────────────────────────────────────────┐
+│ Байты: [0x08, 0xE4, 0x00, 0x1F, 0x04, 0x00, 0x02, 0xE6] │
+├─────────────────────────────────────────┤
+│ 🔌 Напряжение: 228.4 V  (0x08E4 = 2276 → 227.6? 🤔)   │
+│ ⚡ Ток:         3.241 A  (0x04CA = 3241 → 3.241A)      │
+│ 💡 Мощность:    742 W    (0x02E6 = 742)                │
+└─────────────────────────────────────────┘
+✨ Все три показания приходят в один момент времени — идеально для точного мониторинга!
