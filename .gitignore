@@ -1,54 +1,116 @@
-# http://www.gnu.org/software/automake
+# ==================================================
+# ESPHome SINOTIMER Project - .gitignore
+# ==================================================
 
-Makefile.in
-/ar-lib
-/mdate-sh
-/py-compile
-/test-driver
-/ylwrap
-.deps/
-.dirstamp
+# -------------------- Секреты и пароли --------------------
+secrets.yaml
+*secrets.yaml
+!example.secrets.yaml
 
-# http://www.gnu.org/software/autoconf
+# -------------------- Скомпилированные файлы ESPHome --------------------
+# Собранные прошивки
+*.bin
+*.bin.gz
+*.hex
+*.elf
+*.map
 
-autom4te.cache
-/autoscan.log
-/autoscan-*.log
-/aclocal.m4
-/compile
-/config.cache
-/config.guess
-/config.h.in
-/config.log
-/config.status
-/config.sub
-/configure
-/configure.scan
-/depcomp
-/install-sh
-/missing
-/stamp-h1
+# Сборки ESPHome (папка .esphome)
+.esphome/
+build/
+dist/
 
-# https://www.gnu.org/software/libtool/
+# -------------------- Логи и отладочные файлы --------------------
+*.log
+*.log.*
+logs/
+debug.log
+debug_*.txt
 
-/libtool
-/ltmain.sh
-.libs/
+# -------------------- Временные файлы --------------------
+*.tmp
+*.temp
+*.bak
+*.backup
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*.orig
+*.rej
 
-# http://www.gnu.org/software/texinfo
+# -------------------- Файлы зависимостей --------------------
+# ESPHome внешние компоненты (если используете)
+esphome-components/
+custom_components/
+!custom_components/README.md
 
-/texinfo.tex
+# -------------------- IDE и редакторы --------------------
+# VSCode
+.vscode/
+!.vscode/extensions.json
+*.code-workspace
 
-# http://www.gnu.org/software/m4/
+# PyCharm / IntelliJ
+.idea/
+*.iml
 
-m4/libtool.m4
-m4/ltoptions.m4
-m4/ltsugar.m4
-m4/ltversion.m4
-m4/lt~obsolete.m4
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
 
-# Generated Makefile
-# (meta build system like autotools,
-# can automatically generate from config.status script
-# (which is called by configure script))
-Makefile
+# -------------------- Python специфичные файлы --------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+htmlcov/
+
+# -------------------- Документация и временные сборки --------------------
+# Сгенерированная документация
+docs/_build/
+site/
+
+# Экспортированные конфиги
+exported_configs/
+backup_*.yaml
+
+# -------------------- Файлы с реальными данными --------------------
+# Если вы сохраняли дампы Tuya
+tuya_dump*.txt
+dp_dump*.json
+
+# Логи с реальными MAC адресами
+wifi_scan*.txt
+mac_list*.txt
+
+# -------------------- Образы для прошивки --------------------
+# Файлы для ESPHome Flasher
+*.flasher.json
+flash_*.bat
+flash_*.sh
+
+# -------------------- Пользовательские настройки --------------------
+# Локальные оверрайды
+local_overrides.yaml
+user_overrides.yaml
+*.local.yaml
+
+# -------------------- Но НЕ игнорируем --------------------
+# Важно: сохраняем примеры и шаблоны
+!example.secrets.yaml
+!*.example.yaml
+!README.md
+!LICENSE
+!.github/
+!docs/README.md
