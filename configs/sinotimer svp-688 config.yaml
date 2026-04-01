@@ -1,0 +1,1081 @@
+# ==================================================
+# GEYA Smart AC - ESPHome Configuration
+# Smart Protection and Power Monitoring Device
+# ==================================================
+
+# -------------------- SUBSTITUTIONS --------------------
+substitutions:
+  wifi_ssid: !secret wifi_ssid
+  wifi_password: !secret wifi_password
+  wifi_ssid2: !secret wifi_ssid2
+  wifi_password2: !secret wifi_password2
+  ota_password: "esphome"
+  device_name: "sinotimer-smart-ac"
+  friendly_name: "Sinotimer svp-688w"
+  device_timezone: "Europe/Moscow"
+
+# -------------------- MAIN CONFIGURATION --------------------
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  comment: 'Умный автоматический выключатель SINOTIMER SVP688W 2P 63A'
+  name_add_mac_suffix: true
+  on_boot:
+    then:
+      - lambda: |-
+          // Device booted
+
+# -------------------- PLATFORM --------------------
+esp8266:
+  board: esp12e
+  framework:
+    version: recommended
+
+# -------------------- LOGGING --------------------
+logger:
+  level: INFO
+  initial_level: INFO
+  baud_rate: 9600
+  logs:
+    api: WARN
+    wifi: WARN
+    sensor: INFO
+    text_sensor: INFO
+    script: INFO
+    switch: INFO
+    ota: INFO
+    tuya: INFO
+    json: ERROR
+
+# -------------------- WEB INTERFACE --------------------
+web_server:
+  port: 80
+  version: 3
+  sorting_groups:
+    - id: group_main
+      name: "📊Main Parameters"
+      sorting_weight: 10
+    - id: group_energy
+      name: "⚡Energy"
+      sorting_weight: 11
+    - id: group_protection_temp
+      name: "🌡Protection: Temperature"
+      sorting_weight: 12
+    - id: group_protection_leak
+      name: "💧Protection: Leakage"
+      sorting_weight: 13
+    - id: group_protection_current
+      name: "⚡Protection: Current"
+      sorting_weight: 14
+    - id: group_protection_voltage
+      name: "⚡Protection: Voltage"
+      sorting_weight: 15
+    # - id: group_protection_flow
+    #   name: "💨Protection: Flow"
+    #   sorting_weight: 16
+
+
+# -------------------- SERVICE COMPONENTS --------------------
+captive_portal:
+mdns:
+debug:
+  update_interval: 30s
+api:
+  reboot_timeout: 0s
+
+ota:
+  - platform: esphome
+    id: my_ota
+    password: $ota_password
+
+# -------------------- WiFi --------------------
+wifi:
+  reboot_timeout: 0s
+  networks:
+    - ssid: $wifi_ssid
+      password: $wifi_password
+      priority: 2
+    - ssid: $wifi_ssid2
+      password: $wifi_password2
+      priority: 1
+  min_auth_mode: WPA2
+  ap:
+    ssid: "${friendly_name} Hotspot"
+    password: "T3YvuZbeBY"
+    ap_timeout: 60s
+
+# -------------------- UART for Tuya --------------------
+uart:
+  rx_pin: GPIO3
+  tx_pin: GPIO1
+  baud_rate: 9600
+
+# -------------------- TIME --------------------
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: ${device_timezone}
+    servers:
+      - 0.pool.ntp.org
+      - 1.pool.ntp.org
+      - 2.pool.ntp.org
+    update_interval: 60min
+  - platform: homeassistant
+    id: homeassistant_time
+    timezone: ${device_timezone}
+    update_interval: 60min
+    on_time_sync:
+      - logger.log: "System time synchronized"
+
+# ==================================================
+#                    Tuya CONFIGURATION
+# ==================================================
+tuya:
+  id: tuya_client
+  time_id: homeassistant_time
+
+  on_datapoint_update:
+
+    # ----- DP 6: Main electrical parameters -----
+    - sensor_datapoint: 6
+      datapoint_type: raw
+      then:
+        - lambda: |-
+            if (x.size() >= 8) {
+              id(voltage).publish_state((x[0] << 8 | x[1]) * 0.1);
+              id(current).publish_state((x[3] << 8 | x[4]) * 0.001);
+              id(power).publish_state((x[6] << 8 | x[7]) * 1);
+            }
+
+    # ----- DP 9: Fault bitmap -----
+    - sensor_datapoint: 9
+      datapoint_type: bitmask
+      then:
+        - lambda: |-
+            std::string active_faults = "";
+            if (x & 0x0001) active_faults += "⚡Short Circuit\n";
+            if (x & 0x0002) active_faults += "📈Voltage Spike\n";
+            if (x & 0x0004) active_faults += "⚠️Overload\n";
+            if (x & 0x0008) active_faults += "💧Leakage\n";
+            if (x & 0x0010) active_faults += "🌡️ Temp Differential\n";
+            if (x & 0x0020) active_faults += "🔥Fire\n";
+            if (x & 0x0040) active_faults += "⚡High Power\n";
+            if (x & 0x0080) active_faults += "🔧Self-test Error\n";
+            if (x & 0x0100) active_faults += "⚡Overcurrent\n";
+            if (x & 0x0200) active_faults += "⚖️Unbalance\n";
+            if (x & 0x0400) active_faults += "⬆️Overvoltage\n";
+            if (x & 0x0800) active_faults += "⬇️Undervoltage\n";
+            if (x & 0x1000) active_faults += "🔌Phase Loss\n";
+            if (x & 0x2000) active_faults += "⏹️Trip\n";
+            if (x & 0x4000) active_faults += "🧲Magnetic Field\n";
+            if (x & 0x8000) active_faults += "💰Credit\n";
+            if (x & 0x10000) active_faults += "💳No Balance\n";
+            if (x & 0x20000) active_faults += "🔄Phase Seq Error\n";
+            if (x & 0x40000) active_faults += "⚖️Voltage Unbalance\n";
+            if (x & 0x80000) active_faults += "📉Low Current\n";
+            
+            if (active_faults.empty()) {
+              id(active_faults_text).publish_state("No active faults");
+            } else {
+              if (!active_faults.empty() && active_faults.back() == '\n') {
+                active_faults.pop_back();
+              }
+              id(active_faults_text).publish_state(active_faults);
+            }
+
+    # ----- DP 111: Device status -----
+    - sensor_datapoint: 111
+      datapoint_type: enum
+      then:
+        - text_sensor.template.publish:
+            id: tuya_status
+            state: !lambda |-
+              switch(x) {
+                case 0: return "🟡Standby";
+                case 1: return "🟢Running";
+                case 2: return "🔴Error";
+                default: return std::to_string(x);
+              }
+
+    # ============ ENERGY ============
+    - sensor_datapoint: 1
+      datapoint_type: uint
+      then:
+        - lambda: |-
+            id(total_energy).publish_state(x * 0.01);
+
+    - sensor_datapoint: 13
+      datapoint_type: uint
+      then:
+        - lambda: |-
+            id(balance_energy).publish_state(x * 0.01);
+
+    - sensor_datapoint: 14
+      datapoint_type: uint
+      then:
+        - lambda: |-
+            id(charge_energy).publish_state(x * 0.01);
+
+    - sensor_datapoint: 110
+      datapoint_type: uint
+      then:
+        - lambda: |-
+            id(reverse_energy).publish_state(x * 0.01);
+
+    # ============ PROTECTION MEASUREMENTS ============
+    - sensor_datapoint: 15
+      datapoint_type: uint
+      then:
+        - lambda: |-
+            id(leakage_current).publish_state(x);
+
+    - sensor_datapoint: 103
+      datapoint_type: uint
+      then:
+        - lambda: |-
+            id(temperature).publish_state(x);
+
+    # ============ ALARM SET 1 (DP 17) - Leakage and Temperature ============
+    - sensor_datapoint: 17
+      datapoint_type: raw
+      then:
+        - lambda: |-
+            if (x.size() >= 8) {
+              id(alarm1_leak_enabled_state).publish_state(x[1]);
+              id(alarm1_leak_threshold).publish_state((x[2] << 8) | x[3]);
+              id(alarm1_temp_enabled_state).publish_state(x[5]);
+              id(alarm1_temp_threshold).publish_state((x[6] << 8) | x[7]);
+            }
+
+    # ============ ALARM SET 2 (DP 18) - Current and Voltage ============
+    - sensor_datapoint: 18
+      datapoint_type: raw
+      then:
+        - lambda: |-
+            if (x.size() >= 12) {
+              id(alarm2_overcurrent_enabled_state).publish_state(x[1]);
+              id(alarm2_overcurrent_threshold).publish_state((x[2] << 8) | x[3]);
+              id(alarm2_overvoltage_enabled_state).publish_state(x[5]);
+              id(alarm2_overvoltage_threshold).publish_state((x[6] << 8) | x[7]);
+              id(alarm2_undervoltage_enabled_state).publish_state(x[9]);
+              id(alarm2_undervoltage_threshold).publish_state((x[10] << 8) | x[11]);
+            }
+
+    # # ============ ALARM SET 3 (DP 126) - Flow Loss ============
+    # - sensor_datapoint: 126
+    #   datapoint_type: raw
+    #   then:
+    #     - lambda: |-
+    #         if (x.size() >= 4) {
+    #           id(alarm3_lost_flow_enabled_state).publish_state(x[1]);
+    #           id(alarm3_lost_flow_threshold).publish_state((x[2] << 8) | x[3]);
+    #         }
+
+# ==================================================
+#                    SENSORS
+# ==================================================
+sensor:
+
+  # ---------- Main electrical parameters (group_main) ----------
+  - platform: template
+    id: voltage
+    name: "Voltage"
+    unit_of_measurement: "V"
+    icon: "mdi:power-plug"
+    accuracy_decimals: 1
+    update_interval: 2s
+    web_server:
+      sorting_group_id: group_main
+      sorting_weight: 10
+
+  - platform: template
+    id: current
+    name: "Current"
+    unit_of_measurement: "A"
+    icon: "mdi:current-ac"
+    accuracy_decimals: 3
+    update_interval: 3s
+    web_server:
+      sorting_group_id: group_main
+      sorting_weight: 11
+
+  - platform: template
+    id: power
+    name: "Power"
+    unit_of_measurement: "W"
+    icon: "mdi:flash"
+    accuracy_decimals: 1
+    update_interval: 4s
+    web_server:
+      sorting_group_id: group_main
+      sorting_weight: 12
+
+  # ---------- Energy (group_energy) ----------
+  - platform: template
+    id: total_energy
+    name: "Total Energy"
+    unit_of_measurement: "kWh"
+    icon: "mdi:counter"
+    accuracy_decimals: 2
+    update_interval: 2s
+    web_server:
+      sorting_group_id: group_energy
+      sorting_weight: 10
+
+  - platform: template
+    id: reverse_energy
+    name: "Reverse Energy"
+    unit_of_measurement: "kWh"
+    icon: "mdi:counter"
+    accuracy_decimals: 2
+    update_interval: 2s
+    web_server:
+      sorting_group_id: group_energy
+      sorting_weight: 11
+
+  - platform: template
+    id: balance_energy
+    name: "Balance Energy"
+    unit_of_measurement: "kWh"
+    icon: "mdi:battery"
+    accuracy_decimals: 2
+    update_interval: 2s
+    web_server:
+      sorting_group_id: group_energy
+      sorting_weight: 12
+
+  - platform: template
+    id: charge_energy
+    name: "Charge Energy"
+    unit_of_measurement: "kWh"
+    icon: "mdi:lightning-bolt"
+    accuracy_decimals: 2
+    update_interval: 2s
+    web_server:
+      sorting_group_id: group_energy
+      sorting_weight: 13
+
+  # ---------- Protection measurements (group_protection) ----------
+  - platform: template
+    id: leakage_current
+    name: "Leakage Current"
+    unit_of_measurement: "mA"
+    icon: "mdi:current-ac"
+    accuracy_decimals: 0
+    update_interval: 2s
+    web_server:
+      sorting_group_id: group_protection_leak
+      sorting_weight: 10
+
+  - platform: template
+    id: temperature
+    name: "Temperature t°"
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer"
+    accuracy_decimals: 0
+    update_interval: 2s
+    web_server:
+      sorting_group_id: group_protection_temp
+      sorting_weight: 11
+
+  # ---------- INTERNAL SENSORS (for state storage) ----------
+  # (These sensors receive values from Tuya)
+
+  # Alarm1
+  - platform: template
+    id: alarm1_leak_enabled_state
+    internal: true
+    update_interval: 1s
+
+  - platform: template
+    id: alarm1_temp_enabled_state
+    internal: true
+    update_interval: 1s
+
+  - platform: template
+    id: alarm1_leak_threshold
+    internal: true
+    update_interval: 1s
+
+  - platform: template
+    id: alarm1_temp_threshold
+    internal: true
+    update_interval: 1s
+
+  # Alarm2
+  - platform: template
+    id: alarm2_overcurrent_enabled_state
+    internal: true
+    update_interval: 1s
+
+  - platform: template
+    id: alarm2_overcurrent_threshold
+    internal: true
+    update_interval: 1s
+
+  - platform: template
+    id: alarm2_overvoltage_enabled_state
+    internal: true
+    update_interval: 1s
+
+  - platform: template
+    id: alarm2_overvoltage_threshold
+    internal: true
+    update_interval: 1s
+
+  - platform: template
+    id: alarm2_undervoltage_enabled_state
+    internal: true
+    update_interval: 1s
+
+  - platform: template
+    id: alarm2_undervoltage_threshold
+    internal: true
+    update_interval: 1s
+
+  # Alarm3
+  - platform: template
+    id: alarm3_lost_flow_enabled_state
+    internal: true
+    update_interval: 1s
+
+  - platform: template
+    id: alarm3_lost_flow_threshold
+    internal: true
+    update_interval: 1s
+
+  # ---------- THRESHOLD DISPLAY (group_protection) ----------
+  # These sensors read values from internal ones and display them
+
+  - platform: template
+    name: "Leakage Threshold"
+    id: alarm1_leak_display
+    unit_of_measurement: "mA"
+    icon: "mdi:current-ac"
+    lambda: |-
+      return id(alarm1_leak_threshold).state;
+    update_interval: 2s
+    accuracy_decimals: 0
+    web_server:
+      sorting_group_id: group_protection_leak
+      sorting_weight: 60
+
+  - platform: template
+    name: "Temp Threshold"
+    id: alarm1_temp_display
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-alert"
+    lambda: |-
+      float value = id(alarm1_temp_threshold).state;
+      if (std::isnan(value) || value > 1000) {
+        return NAN; 
+      }
+      return value;
+    update_interval: 2s
+    accuracy_decimals: 0
+    web_server:
+      sorting_group_id: group_protection_temp
+      sorting_weight: 61
+
+  - platform: template
+    name: "Current Threshold"
+    id: alarm2_current_display
+    unit_of_measurement: "A"
+    icon: "mdi:current-ac"
+    lambda: |-
+      return id(alarm2_overcurrent_threshold).state / 10.0;
+    update_interval: 2s
+    accuracy_decimals: 1
+    web_server:
+      sorting_group_id: group_protection_current
+      sorting_weight: 62
+
+  - platform: template
+    name: "Overvoltage Threshold"
+    id: alarm2_overvoltage_display
+    unit_of_measurement: "V"
+    icon: "mdi:flash-alert"
+    lambda: |-
+      return id(alarm2_overvoltage_threshold).state;
+    update_interval: 2s
+    accuracy_decimals: 0
+    web_server:
+      sorting_group_id: group_protection_voltage
+      sorting_weight: 63
+
+  - platform: template
+    name: "Undervoltage Threshold"
+    id: alarm2_undervoltage_display
+    unit_of_measurement: "V"
+    icon: "mdi:flash-alert"
+    lambda: |-
+      return id(alarm2_undervoltage_threshold).state;
+    update_interval: 2s
+    accuracy_decimals: 0
+    web_server:
+      sorting_group_id: group_protection_voltage
+      sorting_weight: 64
+
+  # - platform: template
+  #   name: "Flow Loss Threshold"
+  #   id: alarm3_lost_flow_display
+  #   unit_of_measurement: "A"
+  #   icon: "mdi:water"
+  #   lambda: |-
+  #     return id(alarm3_lost_flow_threshold).state / 10.0;
+  #   update_interval: 1s
+  #   accuracy_decimals: 1
+  #   web_server:
+  #     sorting_group_id: group_protection_flow
+  #     sorting_weight: 65
+
+  # ---------- System sensors (group_system) ----------
+  - platform: uptime
+    name: "Uptime"
+    icon: "mdi:timer-outline"
+    update_interval: 10s
+    entity_category: diagnostic
+    # web_server:
+    #   sorting_group_id: group_system
+    #   sorting_weight: 30
+
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    icon: "mdi:wifi-strength-4"
+    update_interval: 10s
+    entity_category: diagnostic
+    # web_server:
+    #   sorting_group_id: group_system
+    #   sorting_weight: 31
+
+# ==================================================
+#                 TEXT SENSORS
+# ==================================================
+text_sensor:
+  - platform: debug
+    reset_reason:
+      name: "Reset Reason"
+      icon: "mdi:restart-alert"
+      entity_category: diagnostic
+      # web_server:
+      #   sorting_group_id: group_system
+      #   sorting_weight: 40
+
+  - platform: template
+    name: "Current Time"
+    id: current_datetime
+    icon: "mdi:clock"
+    update_interval: 1min
+    lambda: |-
+      auto time = id(homeassistant_time).now();
+      if (time.is_valid()) {
+        return time.strftime("%H:%M:%S %d.%m.%y");
+      } else {
+        return {"Waiting..."};
+      }
+    entity_category: diagnostic
+
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+      icon: "mdi:ip-network"
+      entity_category: diagnostic
+      # web_server:
+      #   sorting_group_id: group_system
+      #   sorting_weight: 41
+    ssid:
+      name: "WiFi SSID"
+      icon: "mdi:access-point"
+      entity_category: diagnostic
+      # web_server:
+      #   sorting_group_id: group_system
+      #   sorting_weight: 42
+    bssid:
+      name: "WiFi BSSID"
+      icon: "mdi:access-point"
+      entity_category: diagnostic
+      # web_server:
+      #   sorting_group_id: group_system
+      #   sorting_weight: 43
+    mac_address:
+      name: "MAC Address"
+      icon: "mdi:network"
+      entity_category: diagnostic
+      # web_server:
+      #   sorting_group_id: group_system
+      #   sorting_weight: 44
+
+  - platform: template
+    id: tuya_status
+    name: "Device Status"
+    icon: "mdi:information"
+    update_interval: 1s
+    entity_category: config
+    web_server:
+      sorting_group_id: group_main
+      sorting_weight: 45
+    # lambda: |-
+
+    #   return {"Unknown"};
+
+  - platform: template
+    name: "Relay State"
+    icon: "mdi:power-settings"
+    lambda: |-
+      if (id(relay_switch).state) {
+        return {"▶️ON"};
+      } else {
+        return {"⏹️OFF"};
+      }
+    update_interval: 2s
+    web_server:
+      sorting_group_id: group_main
+      sorting_weight: 21
+
+  - platform: template
+    name: "Active Faults"
+    id: active_faults_text
+    icon: "mdi:alert"
+    update_interval: 10s
+    web_server:
+      sorting_group_id: group_main
+      sorting_weight: 120
+    lambda: |-
+      return {"🆗No faults"};
+
+# ==================================================
+#                   SWITCHES
+# ==================================================
+switch:
+  # ---------- Main (group_main, group_energy) ----------
+  - platform: tuya
+    id: relay_switch
+    switch_datapoint: 16
+    name: "Main Switch"
+    icon: "mdi:power"
+    web_server:
+      sorting_group_id: group_main
+      sorting_weight: 20
+
+  - platform: tuya
+    switch_datapoint: 11
+    name: "Prepayment Mode"
+    icon: "mdi:cash"
+    web_server:
+      sorting_group_id: group_energy
+      sorting_weight: 20
+
+  - platform: tuya
+    switch_datapoint: 104
+    name: "Auto Reclose"
+    icon: "mdi:autorenew"
+    web_server:
+      sorting_group_id: group_main
+      sorting_weight: 20
+
+  # ---------- Protection switches (group_protection) ----------
+  - platform: template
+    name: "Protection: Leakage"
+    id: alarm1_leak_enable
+    icon: "mdi:shield-check"
+    lambda: |-
+      return id(alarm1_leak_enabled_state).state;
+    turn_on_action:
+      then:
+        - lambda: |-
+            uint16_t leak = id(alarm1_leak_threshold).state;
+            uint8_t temp_en = id(alarm1_temp_enabled_state).state;
+            uint16_t temp = id(alarm1_temp_threshold).state;
+            std::vector<uint8_t> data = {0x04, 0x01, uint8_t(leak>>8), uint8_t(leak&0xFF), 0x05, temp_en, uint8_t(temp>>8), uint8_t(temp&0xFF)};
+            id(tuya_client)->set_raw_datapoint_value(17, data);
+    turn_off_action:
+      then:
+        - lambda: |-
+            uint16_t leak = id(alarm1_leak_threshold).state;
+            uint8_t temp_en = id(alarm1_temp_enabled_state).state;
+            uint16_t temp = id(alarm1_temp_threshold).state;
+            std::vector<uint8_t> data = {0x04, 0x00, uint8_t(leak>>8), uint8_t(leak&0xFF), 0x05, temp_en, uint8_t(temp>>8), uint8_t(temp&0xFF)};
+            id(tuya_client)->set_raw_datapoint_value(17, data);
+    restore_mode: RESTORE_DEFAULT_OFF
+    web_server:
+      sorting_group_id: group_protection_leak
+      sorting_weight: 70
+
+  - platform: template
+    name: "Protection: Temperature t°"
+    id: alarm1_temp_enable
+    icon: "mdi:shield-check"
+    lambda: |-
+      return id(alarm1_temp_enabled_state).state;
+    turn_on_action:
+      then:
+        - lambda: |-
+            uint8_t leak_en = id(alarm1_leak_enabled_state).state;
+            uint16_t leak = id(alarm1_leak_threshold).state;
+            uint16_t temp = id(alarm1_temp_threshold).state;
+            std::vector<uint8_t> data = {0x04, leak_en, uint8_t(leak>>8), uint8_t(leak&0xFF), 0x05, 0x01, uint8_t(temp>>8), uint8_t(temp&0xFF)};
+            id(tuya_client)->set_raw_datapoint_value(17, data);
+    turn_off_action:
+      then:
+        - lambda: |-
+            uint8_t leak_en = id(alarm1_leak_enabled_state).state;
+            uint16_t leak = id(alarm1_leak_threshold).state;
+            uint16_t temp = id(alarm1_temp_threshold).state;
+            std::vector<uint8_t> data = {0x04, leak_en, uint8_t(leak>>8), uint8_t(leak&0xFF), 0x05, 0x00, uint8_t(temp>>8), uint8_t(temp&0xFF)};
+            id(tuya_client)->set_raw_datapoint_value(17, data);
+    restore_mode: RESTORE_DEFAULT_OFF
+    web_server:
+      sorting_group_id: group_protection_temp
+      sorting_weight: 71
+
+  - platform: template
+    name: "Protection: Overcurrent"
+    id: alarm2_overcurrent_enable
+    icon: "mdi:shield-check"
+    lambda: |-
+      return id(alarm2_overcurrent_enabled_state).state;
+    turn_on_action:
+      then:
+        - lambda: |-
+            uint16_t curr = id(alarm2_overcurrent_threshold).state;
+            uint8_t ov_en = id(alarm2_overvoltage_enabled_state).state;
+            uint16_t ov = id(alarm2_overvoltage_threshold).state;
+            uint8_t uv_en = id(alarm2_undervoltage_enabled_state).state;
+            uint16_t uv = id(alarm2_undervoltage_threshold).state;
+            std::vector<uint8_t> data = {0x01, 0x01, uint8_t(curr>>8), uint8_t(curr&0xFF), 0x03, ov_en, uint8_t(ov>>8), uint8_t(ov&0xFF), 0x04, uv_en, uint8_t(uv>>8), uint8_t(uv&0xFF)};
+            id(tuya_client)->set_raw_datapoint_value(18, data);
+    turn_off_action:
+      then:
+        - lambda: |-
+            uint16_t curr = id(alarm2_overcurrent_threshold).state;
+            uint8_t ov_en = id(alarm2_overvoltage_enabled_state).state;
+            uint16_t ov = id(alarm2_overvoltage_threshold).state;
+            uint8_t uv_en = id(alarm2_undervoltage_enabled_state).state;
+            uint16_t uv = id(alarm2_undervoltage_threshold).state;
+            std::vector<uint8_t> data = {0x01, 0x00, uint8_t(curr>>8), uint8_t(curr&0xFF), 0x03, ov_en, uint8_t(ov>>8), uint8_t(ov&0xFF), 0x04, uv_en, uint8_t(uv>>8), uint8_t(uv&0xFF)};
+            id(tuya_client)->set_raw_datapoint_value(18, data);
+    restore_mode: RESTORE_DEFAULT_OFF
+    web_server:
+      sorting_group_id: group_protection_current
+      sorting_weight: 72
+
+  - platform: template
+    name: "Protection: Overvoltage"
+    id: alarm2_overvoltage_enable
+    icon: "mdi:shield-check"
+    lambda: |-
+      return id(alarm2_overvoltage_enabled_state).state;
+    turn_on_action:
+      then:
+        - lambda: |-
+            uint8_t oc_en = id(alarm2_overcurrent_enabled_state).state;
+            uint16_t curr = id(alarm2_overcurrent_threshold).state;
+            uint8_t uv_en = id(alarm2_undervoltage_enabled_state).state;
+            uint16_t uv = id(alarm2_undervoltage_threshold).state;
+            std::vector<uint8_t> data = {0x01, oc_en, uint8_t(curr>>8), uint8_t(curr&0xFF), 0x03, 0x01, 0x01, 0x13, 0x04, uv_en, uint8_t(uv>>8), uint8_t(uv&0xFF)};
+            id(tuya_client)->set_raw_datapoint_value(18, data);
+    turn_off_action:
+      then:
+        - lambda: |-
+            uint8_t oc_en = id(alarm2_overcurrent_enabled_state).state;
+            uint16_t curr = id(alarm2_overcurrent_threshold).state;
+            uint8_t uv_en = id(alarm2_undervoltage_enabled_state).state;
+            uint16_t uv = id(alarm2_undervoltage_threshold).state;
+            std::vector<uint8_t> data = {0x01, oc_en, uint8_t(curr>>8), uint8_t(curr&0xFF), 0x03, 0x00, 0x01, 0x13, 0x04, uv_en, uint8_t(uv>>8), uint8_t(uv&0xFF)};
+            id(tuya_client)->set_raw_datapoint_value(18, data);
+    restore_mode: RESTORE_DEFAULT_OFF
+    web_server:
+      sorting_group_id: group_protection_voltage
+      sorting_weight: 73
+
+  - platform: template
+    name: "Protection: Undervoltage"
+    id: alarm2_undervoltage_enable
+    icon: "mdi:shield-check"
+    lambda: |-
+      return id(alarm2_undervoltage_enabled_state).state;
+    turn_on_action:
+      then:
+        - lambda: |-
+            uint8_t oc_en = id(alarm2_overcurrent_enabled_state).state;
+            uint16_t curr = id(alarm2_overcurrent_threshold).state;
+            uint8_t ov_en = id(alarm2_overvoltage_enabled_state).state;
+            uint16_t ov = id(alarm2_overvoltage_threshold).state;
+            std::vector<uint8_t> data = {0x01, oc_en, uint8_t(curr>>8), uint8_t(curr&0xFF), 0x03, ov_en, uint8_t(ov>>8), uint8_t(ov&0xFF), 0x04, 0x01, 0x00, 0xAF};
+            id(tuya_client)->set_raw_datapoint_value(18, data);
+    turn_off_action:
+      then:
+        - lambda: |-
+            uint8_t oc_en = id(alarm2_overcurrent_enabled_state).state;
+            uint16_t curr = id(alarm2_overcurrent_threshold).state;
+            uint8_t ov_en = id(alarm2_overvoltage_enabled_state).state;
+            uint16_t ov = id(alarm2_overvoltage_threshold).state;
+            std::vector<uint8_t> data = {0x01, oc_en, uint8_t(curr>>8), uint8_t(curr&0xFF), 0x03, ov_en, uint8_t(ov>>8), uint8_t(ov&0xFF), 0x04, 0x00, 0x00, 0xAF};
+            id(tuya_client)->set_raw_datapoint_value(18, data);
+    restore_mode: RESTORE_DEFAULT_OFF
+    web_server:
+      sorting_group_id: group_protection_voltage
+      sorting_weight: 74
+
+  # - platform: template
+  #   name: "Protection: Flow Loss"
+  #   id: alarm3_lost_flow_enable
+  #   icon: "mdi:shield-check"
+  #   lambda: |-
+  #     return id(alarm3_lost_flow_enabled_state).state;
+  #   turn_on_action:
+  #     then:
+  #       - lambda: |-
+  #           uint16_t thr = id(alarm3_lost_flow_threshold).state;
+  #           std::vector<uint8_t> data = {0x03, 0x01, uint8_t(thr>>8), uint8_t(thr&0xFF)};
+  #           id(tuya_client)->set_raw_datapoint_value(126, data);
+  #   turn_off_action:
+  #     then:
+  #       - lambda: |-
+  #           uint16_t thr = id(alarm3_lost_flow_threshold).state;
+  #           std::vector<uint8_t> data = {0x03, 0x00, uint8_t(thr>>8), uint8_t(thr&0xFF)};
+  #           id(tuya_client)->set_raw_datapoint_value(126, data);
+  #   web_server:
+  #     sorting_group_id: group_protection_flow
+  #     sorting_weight: 75
+
+# ==================================================
+#                      BUTTONS
+# ==================================================
+button:
+  - platform: restart
+    name: "Restart"
+    icon: "mdi:restart"
+    entity_category: diagnostic
+    # web_server:
+    #   sorting_group_id: group_system
+    #   sorting_weight: 50
+
+  - platform: template
+    name: "Reset Energy"
+    icon: "mdi:arrow-u-right-bottom-bold"
+    on_press:
+      then:
+        - lambda: |-
+            id(tuya_client)->set_boolean_datapoint_value(12, true);
+    web_server:
+      sorting_group_id: group_energy
+      sorting_weight: 21
+
+# ==================================================
+#                      SELECT
+# ==================================================
+select:
+  - platform: logger
+    name: "Log Level"
+    icon: "mdi:format-list-bulleted"
+    entity_category: diagnostic
+    # web_server:
+    #   sorting_group_id: group_system
+    #   sorting_weight: 32
+
+# ==================================================
+#                  NUMBER INPUTS
+# ==================================================
+number:
+
+  # ---------- Protection threshold settings (group_protection) ----------
+  - platform: template
+    name: "Set Leakage Threshold"
+    id: alarm1_leak_setpoint
+    unit_of_measurement: "mA"
+    icon: "mdi:current-ac"
+    min_value: 10
+    max_value: 99
+    step: 1
+    mode: box
+    optimistic: true
+    initial_value: 50
+    restore_value: true
+    entity_category: config
+    web_server:
+      sorting_group_id: group_protection_leak
+      sorting_weight: 80
+    set_action:
+      then:
+        - lambda: |-
+            uint8_t leak_en = id(alarm1_leak_enabled_state).state;
+            uint8_t temp_en = id(alarm1_temp_enabled_state).state;
+            uint16_t temp = id(alarm1_temp_threshold).state;
+            uint16_t new_val = (uint16_t)x;
+            std::vector<uint8_t> data = {0x04, leak_en, uint8_t(new_val>>8), uint8_t(new_val&0xFF), 0x05, temp_en, uint8_t(temp>>8), uint8_t(temp&0xFF)};
+            id(tuya_client)->set_raw_datapoint_value(17, data);
+
+  - platform: template
+    name: "Set Temperature t° Threshold"
+    id: alarm1_temp_setpoint
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-alert"
+    min_value: 10
+    max_value: 85
+    step: 1
+    mode: box
+    optimistic: true
+    initial_value: 80
+    restore_value: true
+    entity_category: config
+    web_server:
+      sorting_group_id: group_protection_temp
+      sorting_weight: 81
+    set_action:
+      then:
+        - lambda: |-
+            uint8_t leak_en = id(alarm1_leak_enabled_state).state;
+            uint16_t leak = id(alarm1_leak_threshold).state;
+            uint8_t temp_en = id(alarm1_temp_enabled_state).state;
+            uint16_t new_val = (uint16_t)x;
+            std::vector<uint8_t> data = {0x04, leak_en, uint8_t(leak>>8), uint8_t(leak&0xFF), 0x05, temp_en, uint8_t(new_val>>8), uint8_t(new_val&0xFF)};
+            id(tuya_client)->set_raw_datapoint_value(17, data);
+
+  - platform: template
+    name: "Set Current Threshold"
+    id: alarm2_overcurrent_setpoint
+    unit_of_measurement: "A"
+    icon: "mdi:current-ac"
+    min_value: 1.0
+    max_value: 63.0
+    step: 0.1
+    mode: box
+    optimistic: true
+    initial_value: 63.0
+    restore_value: true
+    entity_category: config
+    web_server:
+      sorting_group_id: group_protection_current
+      sorting_weight: 82
+    set_action:
+      then:
+        - lambda: |-
+            uint8_t oc_en = id(alarm2_overcurrent_enabled_state).state;
+            uint8_t ov_en = id(alarm2_overvoltage_enabled_state).state;
+            uint16_t ov = id(alarm2_overvoltage_threshold).state;
+            uint8_t uv_en = id(alarm2_undervoltage_enabled_state).state;
+            uint16_t uv = id(alarm2_undervoltage_threshold).state;
+            uint16_t new_val = (uint16_t)(x * 10);
+            std::vector<uint8_t> data = {0x01, oc_en, uint8_t(new_val>>8), uint8_t(new_val&0xFF), 0x03, ov_en, uint8_t(ov>>8), uint8_t(ov&0xFF), 0x04, uv_en, uint8_t(uv>>8), uint8_t(uv&0xFF)};
+            id(tuya_client)->set_raw_datapoint_value(18, data);
+
+  - platform: template
+    name: "Set Overvoltage Threshold"
+    id: alarm2_overvoltage_setpoint
+    unit_of_measurement: "V"
+    icon: "mdi:flash-alert"
+    min_value: 120
+    max_value: 300
+    step: 1
+    mode: box
+    optimistic: true
+    initial_value: 275
+    restore_value: true
+    entity_category: config
+    web_server:
+      sorting_group_id: group_protection_voltage
+      sorting_weight: 83
+    set_action:
+      then:
+        - lambda: |-
+            uint8_t oc_en = id(alarm2_overcurrent_enabled_state).state;
+            uint16_t curr = id(alarm2_overcurrent_threshold).state;
+            uint8_t ov_en = id(alarm2_overvoltage_enabled_state).state;
+            uint8_t uv_en = id(alarm2_undervoltage_enabled_state).state;
+            uint16_t uv = id(alarm2_undervoltage_threshold).state;
+            uint16_t new_val = (uint16_t)x;
+            std::vector<uint8_t> data = {0x01, oc_en, uint8_t(curr>>8), uint8_t(curr&0xFF), 0x03, ov_en, uint8_t(new_val>>8), uint8_t(new_val&0xFF), 0x04, uv_en, uint8_t(uv>>8), uint8_t(uv&0xFF)};
+            id(tuya_client)->set_raw_datapoint_value(18, data);
+
+  - platform: template
+    name: "Set Undervoltage Threshold"
+    id: alarm2_undervoltage_setpoint
+    unit_of_measurement: "V"
+    icon: "mdi:flash-alert"
+    min_value: 80
+    max_value: 210
+    step: 1
+    mode: box
+    optimistic: true
+    initial_value: 175
+    restore_value: true
+    entity_category: config
+    web_server:
+      sorting_group_id: group_protection_voltage
+      sorting_weight: 84
+    set_action:
+      then:
+        - lambda: |-
+            uint8_t oc_en = id(alarm2_overcurrent_enabled_state).state;
+            uint16_t curr = id(alarm2_overcurrent_threshold).state;
+            uint8_t ov_en = id(alarm2_overvoltage_enabled_state).state;
+            uint16_t ov = id(alarm2_overvoltage_threshold).state;
+            uint8_t uv_en = id(alarm2_undervoltage_enabled_state).state;
+            uint16_t new_val = (uint16_t)x;
+            std::vector<uint8_t> data = {0x01, oc_en, uint8_t(curr>>8), uint8_t(curr&0xFF), 0x03, ov_en, uint8_t(ov>>8), uint8_t(ov&0xFF), 0x04, uv_en, uint8_t(new_val>>8), uint8_t(new_val&0xFF)};
+            id(tuya_client)->set_raw_datapoint_value(18, data);
+
+  # - platform: template
+  #   name: "Set Flow Loss Threshold"
+  #   id: alarm3_lost_flow_setpoint
+  #   unit_of_measurement: "A"
+  #   icon: "mdi:water"
+  #   min_value: 0.5
+  #   max_value: 10.0
+  #   step: 0.1
+  #   mode: box
+  #   optimistic: true
+  #   initial_value: 4.0
+  #   restore_value: true
+  #   entity_category: config
+  #   web_server:
+  #     sorting_group_id: group_protection_flow
+  #     sorting_weight: 85
+  #   set_action:
+  #     then:
+  #       - lambda: |-
+  #           uint8_t en = id(alarm3_lost_flow_enabled_state).state;
+  #           uint16_t new_val = (uint16_t)(x * 10);
+  #           std::vector<uint8_t> data = {0x03, en, uint8_t(new_val>>8), uint8_t(new_val&0xFF)};
+  #           id(tuya_client)->set_raw_datapoint_value(126, data);
+
+  # ---------- Other number settings ----------
+  - platform: tuya
+    number_datapoint: 102
+    name: "Reclose Count"
+    unit_of_measurement: "times"
+    icon: "mdi:counter"
+    min_value: 0
+    max_value: 5
+    step: 1
+    mode: box
+    web_server:
+      sorting_group_id: group_main
+      sorting_weight: 90
+
+  - platform: tuya
+    number_datapoint: 107
+    name: "Recovery Time"
+    unit_of_measurement: "s"
+    icon: "mdi:timer-sync"
+    min_value: 5
+    max_value: 99
+    step: 1
+    mode: box
+    web_server:
+      sorting_group_id: group_main
+      sorting_weight: 91
+
+  - platform: tuya
+    number_datapoint: 105
+    name: "Timer"
+    unit_of_measurement: "s"
+    icon: "mdi:timer"
+    min_value: 0
+    max_value: 86400
+    step: 1
+    mode: box
+    web_server:
+      sorting_group_id: group_main
+      sorting_weight: 40
