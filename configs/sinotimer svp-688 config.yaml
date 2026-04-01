@@ -70,9 +70,7 @@ web_server:
     - id: group_protection_voltage
       name: "⚡Protection: Voltage"
       sorting_weight: 15
-    # - id: group_protection_flow
-    #   name: "💨Protection: Flow"
-    #   sorting_weight: 16
+
 
 
 # -------------------- SERVICE COMPONENTS --------------------
@@ -1000,29 +998,6 @@ number:
             std::vector<uint8_t> data = {0x01, oc_en, uint8_t(curr>>8), uint8_t(curr&0xFF), 0x03, ov_en, uint8_t(ov>>8), uint8_t(ov&0xFF), 0x04, uv_en, uint8_t(new_val>>8), uint8_t(new_val&0xFF)};
             id(tuya_client)->set_raw_datapoint_value(18, data);
 
-  # - platform: template
-  #   name: "Set Flow Loss Threshold"
-  #   id: alarm3_lost_flow_setpoint
-  #   unit_of_measurement: "A"
-  #   icon: "mdi:water"
-  #   min_value: 0.5
-  #   max_value: 10.0
-  #   step: 0.1
-  #   mode: box
-  #   optimistic: true
-  #   initial_value: 4.0
-  #   restore_value: true
-  #   entity_category: config
-  #   web_server:
-  #     sorting_group_id: group_protection_flow
-  #     sorting_weight: 85
-  #   set_action:
-  #     then:
-  #       - lambda: |-
-  #           uint8_t en = id(alarm3_lost_flow_enabled_state).state;
-  #           uint16_t new_val = (uint16_t)(x * 10);
-  #           std::vector<uint8_t> data = {0x03, en, uint8_t(new_val>>8), uint8_t(new_val&0xFF)};
-  #           id(tuya_client)->set_raw_datapoint_value(126, data);
 
   # ---------- Other number settings ----------
   - platform: tuya
