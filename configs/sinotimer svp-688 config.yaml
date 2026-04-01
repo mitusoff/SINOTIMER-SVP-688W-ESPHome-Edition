@@ -999,6 +999,7 @@ number:
             id(tuya_client)->set_raw_datapoint_value(18, data);
 
 
+
   # ---------- Other number settings ----------
   - platform: tuya
     number_datapoint: 102
