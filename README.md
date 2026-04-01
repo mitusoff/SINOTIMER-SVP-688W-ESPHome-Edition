@@ -141,12 +141,40 @@ graph LR
           id(power).publish_state((x[6] << 8 | x[7]) * 1);
         }
 ```
-📊 ОДНИМ ПАКЕТОМ (каждые 2 секунды):
-┌─────────────────────────────────────────┐
-│ Байты: [0x08, 0xE4, 0x00, 0x1F, 0x04, 0x00, 0x02, 0xE6] │
-├─────────────────────────────────────────┤
-│ 🔌 Напряжение: 228.4 V  (0x08E4 = 2276 → 227.6? 🤔)   │
-│ ⚡ Ток:         3.241 A  (0x04CA = 3241 → 3.241A)      │
-│ 💡 Мощность:    742 W    (0x02E6 = 742)                │
-└─────────────────────────────────────────┘
-✨ Все три показания приходят в один момент времени — идеально для точного мониторинга!
+
+
+<div align="center">
+  <table border="0" cellpadding="10" cellspacing="0" style="border-collapse: collapse; background: #f6f8fa; border-radius: 12px;">
+    <tr>
+      <td colspan="3" align="center" style="background: #e1f5fe; border-radius: 8px 8px 0 0;">
+        <b>📦 DP6 — ОДНИМ ПАКЕТОМ (каждые 2 секунды)</b>
+      </td>
+    </tr>
+    <tr>
+      <td width="33%" align="center" style="border: 1px solid #ddd;">
+        <code>[0x08, 0xE4]</code><br/>
+        <b>🔌 Напряжение</b><br/>
+        <span style="font-size: 1.2em;">228.4 V</span><br/>
+        <small>0x08E4 = 2276 → 227.6 V</small>
+      </td>
+      <td width="33%" align="center" style="border: 1px solid #ddd;">
+        <code>[0x00, 0xCA]</code><br/>
+        <b>⚡ Ток</b><br/>
+        <span style="font-size: 1.2em;">3.241 A</span><br/>
+        <small>0x00CA = 202 → 0.202 A? 🤔</small>
+      </td>
+      <td width="33%" align="center" style="border: 1px solid #ddd;">
+        <code>[0x02, 0xE6]</code><br/>
+        <b>💡 Мощность</b><br/>
+        <span style="font-size: 1.2em;">742 W</span><br/>
+        <small>0x02E6 = 742</small>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="3" align="center" style="background: #f0f0f0; border-radius: 0 0 8px 8px;">
+        <b>📦 Полный пакет:</b> <code>[0x08, 0xE4, 0x00, 0xCA, 0x02, 0xE6, 0x00, 0x00]</code><br/>
+        ✨ Все три показания приходят синхронно, одним потоком данных!
+      </td>
+    </tr>
+  </table>
+</div>
