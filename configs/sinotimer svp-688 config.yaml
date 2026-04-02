@@ -9,7 +9,9 @@ substitutions:
   wifi_password: !secret wifi_password
   wifi_ssid2: !secret wifi_ssid2
   wifi_password2: !secret wifi_password2
-  ota_password: "esphome"
+  ota_password: !secret ota_password
+  ap_password: !secret ap_password
+  api_key: !secret api_encryption_key
   device_name: "sinotimer-smart-ac"
   friendly_name: "Sinotimer svp-688w"
   device_timezone: "Europe/Moscow"
@@ -79,28 +81,27 @@ captive_portal:
 mdns:
 debug:
   update_interval: 30s
+
 api:
   reboot_timeout: 0s
 
 ota:
   - platform: esphome
     id: my_ota
-    password: $ota_password
+
 
 # -------------------- WiFi --------------------
 wifi:
   reboot_timeout: 0s
   networks:
     - ssid: $wifi_ssid
-      password: $wifi_password
       priority: 2
     - ssid: $wifi_ssid2
-      password: $wifi_password2
       priority: 1
   min_auth_mode: WPA2
+  
   ap:
     ssid: "${friendly_name} Hotspot"
-    password: $ap_password
     ap_timeout: 60s
 
 # -------------------- UART for Tuya --------------------
