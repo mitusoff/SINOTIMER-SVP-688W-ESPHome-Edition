@@ -37,6 +37,17 @@
 
 > *Вот так ваш Home Assistant увидит SINOTIMER после первой прошивки:*
 
+<div align="center">
+  
+| 📊 Основные параметры | 💰 Энергия и стоимость |
+|:---:|:---:|
+| <img src="assets/images/Sinotimer-svp-688w_Page1.png" width="400" style="border-radius: 12px;"> | <img src="assets/images/Sinotimer-svp-688w3_Page2.png" width="400" style="border-radius: 12px;"> |
+
+| 🛡️ Защита и безопасность | 🏠 Дашборд Home Assistant |
+|:---:|:---:|
+| <img src="assets/images/Sinotimer-svp-688w_Page3.png" width="400" style="border-radius: 12px;"> | <img src="assets/images/Sinotimer-svp-688w-Home-Assistant.png" width="400" style="border-radius: 12px;"> |
+
+</div>
 
 ⚡ Что умеет эта прошивка
 <table> <tr> <td width="33%"> <h3>🔍 <strong>Мониторинг 24/7</strong></h3> <ul> <li>Напряжение, ток, мощность — с точностью до 0.1V и 1mA</li> <li>4 вида счётчиков энергии: общий, обратный, баланс, заряд</li> <li>WiFi Signal, Uptime, IP — всё под рукой</li> </ul> </td> <td width="33%"> <h3>🛡️ <strong>6 уровней защиты</strong></h3> <ul> <li>Ток утечки (10-99 mA)</li> <li>Перегруз по току (1-63A)</li> <li>Перенапряжение / Пониженное напряжение</li> <li>Температурная защита (10-85°C)</li> <li>Автоматическое повторное включение</li> <li>Диагностика 20+ типов аварий</li> </ul> </td> <td width="33%"> <h3>🎮 <strong>Полный контроль</strong></h3> <ul> <li>Веб-интерфейс ESPHome</li> <li>Управление через Home Assistant</li> <li>Автоматизации по любым параметрам</li> <li>Предоплатный режим (для аренды)</li> </ul> </td> </tr> </table>
