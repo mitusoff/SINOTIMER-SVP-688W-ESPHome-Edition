@@ -1,5 +1,5 @@
 # ==================================================
-# GEYA Smart AC - ESPHome Configuration
+# SINOTIMER SVP688W Smart AC - ESPHome Configuration
 # Smart Protection and Power Monitoring Device
 # ==================================================
 
@@ -19,12 +19,12 @@ substitutions:
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
-  comment: 'Умный автоматический выключатель SINOTIMER SVP688W 2P 63A'
+  comment: 'Smart automatic circuit breaker SINOTIMER SVP688W 2P 63A'
   name_add_mac_suffix: true
   on_boot:
     then:
       - lambda: |-
-          // Device booted
+          ESP_LOGI("boot", "✅ Device booted");
 
 # -------------------- PLATFORM --------------------
 esp8266:
@@ -35,7 +35,7 @@ esp8266:
 # -------------------- LOGGING --------------------
 logger:
   level: INFO
-  initial_level: INFO
+  initial_level: WARN
   baud_rate: 9600
   logs:
     api: WARN
@@ -674,15 +674,21 @@ sensor:
   # ---------- System sensors (group_system) ----------
   - platform: uptime
     name: "Uptime"
+    id: uptime_sensor
     icon: "mdi:timer-outline"
     update_interval: 10s
     entity_category: diagnostic
+    unit_of_measurement: "days"
+    accuracy_decimals: 1
+    filters:
+      - lambda: return x / 86400.0;
     # web_server:
     #   sorting_group_id: group_system
     #   sorting_weight: 30
     
   - platform: wifi_signal
     name: "WiFi Signal"
+    id: wifi_rssi
     icon: "mdi:wifi-strength-4"
     update_interval: 10s
     entity_category: diagnostic
@@ -814,6 +820,28 @@ text_sensor:
     web_server:
       sorting_group_id: group_energy
       sorting_weight: 1
+
+  - platform: template
+    name: "WiFi Signal Quality"
+    id: wifi_quality_text
+    icon: "mdi:wifi"
+    update_interval: 30s
+    entity_category: diagnostic
+    lambda: |-
+      float rssi = id(wifi_rssi).state;
+      
+      if (rssi > -50) {
+        return {"📶 Отлично (рядом с роутером)"};
+      } else if (rssi > -60) {
+        return {"📶 Хорошо (в одной комнате)"};
+      } else if (rssi > -70) {
+        return {"📶 Средне (1-2 стены)"};
+      } else if (rssi > -80) {
+        return {"📶 Слабо (2-3 стены)"};
+      } else {
+        return {"📶 Очень слабо (далеко или много помех)"};
+      }
+
 
 # ==================================================
 #                   SWITCHES
@@ -989,27 +1017,7 @@ switch:
       sorting_group_id: group_protection_voltage
       sorting_weight: 74
 
-  # - platform: template
-  #   name: "Protection: Flow Loss"
-  #   id: alarm3_lost_flow_enable
-  #   icon: "mdi:shield-check"
-  #   lambda: |-
-  #     return id(alarm3_lost_flow_enabled_state).state;
-  #   turn_on_action:
-  #     then:
-  #       - lambda: |-
-  #           uint16_t thr = id(alarm3_lost_flow_threshold).state;
-  #           std::vector<uint8_t> data = {0x03, 0x01, uint8_t(thr>>8), uint8_t(thr&0xFF)};
-  #           id(tuya_client)->set_raw_datapoint_value(126, data);
-  #   turn_off_action:
-  #     then:
-  #       - lambda: |-
-  #           uint16_t thr = id(alarm3_lost_flow_threshold).state;
-  #           std::vector<uint8_t> data = {0x03, 0x00, uint8_t(thr>>8), uint8_t(thr&0xFF)};
-  #           id(tuya_client)->set_raw_datapoint_value(126, data);
-  #   web_server:
-  #     sorting_group_id: group_protection_flow
-  #     sorting_weight: 75
+
 
 # ==================================================
 #                      BUTTONS
