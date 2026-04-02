@@ -13,6 +13,7 @@ substitutions:
   device_name: "sinotimer-smart-ac"
   friendly_name: "Sinotimer svp-688w"
   device_timezone: "Europe/Moscow"
+  electricity_tariff: "7.1"
 
 # -------------------- MAIN CONFIGURATION --------------------
 esphome:
@@ -56,7 +57,7 @@ web_server:
       name: "📊Main Parameters"
       sorting_weight: 10
     - id: group_energy
-      name: "⚡Energy"
+      name: "⚡Energy and cost💲"
       sorting_weight: 11
     - id: group_protection_temp
       name: "🌡Protection: Temperature"
@@ -260,6 +261,77 @@ tuya:
             }
 
 
+globals:
+  - id: daily_energy_kwh
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+  - id: weekly_energy_kwh
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+  - id: monthly_energy_kwh
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+  - id: last_reset_day
+    type: int
+    restore_value: yes
+    initial_value: '0'
+  - id: last_reset_week
+    type: int
+    restore_value: yes
+    initial_value: '0'
+  - id: last_reset_month
+    type: int
+    restore_value: yes
+    initial_value: '0'
+  - id: last_total_energy
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+  - id: meter_offset_kwh
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+
+interval:
+  - interval: 60s
+    then:
+      - lambda: |-
+          auto time = id(homeassistant_time).now();
+          if (!time.is_valid()) return;
+          
+          float current_total = id(total_energy).state;
+          float energy_increment = 0;
+          
+          if (id(last_total_energy) > 0 && current_total > id(last_total_energy)) {
+            energy_increment = current_total - id(last_total_energy);
+          }
+          id(last_total_energy) = current_total;
+          
+          id(daily_energy_kwh) += energy_increment;
+          id(weekly_energy_kwh) += energy_increment;
+          id(monthly_energy_kwh) += energy_increment;
+          
+          int current_day = time.day_of_month;
+          int current_week = time.day_of_week;
+          int current_month = time.month;
+          
+          if (id(last_reset_day) != current_day) {
+            if (id(last_reset_day) != 0) id(daily_energy_kwh) = 0;
+            id(last_reset_day) = current_day;
+          }
+          
+          if (current_week == 1 && id(last_reset_week) != current_week) {
+            if (id(last_reset_week) != 0) id(weekly_energy_kwh) = 0;
+            id(last_reset_week) = current_week;
+          }
+          
+          if (id(last_reset_month) != current_month) {
+            if (id(last_reset_month) != 0) id(monthly_energy_kwh) = 0;
+            id(last_reset_month) = current_month;
+          }
 
 # ==================================================
 #                    SENSORS
@@ -502,6 +574,102 @@ sensor:
       sorting_group_id: group_protection_voltage
       sorting_weight: 64
 
+  # Energy statistics
+  - platform: template
+    name: "Daily Energy"
+    id: daily_energy
+    unit_of_measurement: "kWh"
+    icon: "mdi:counter"
+    accuracy_decimals: 2
+    update_interval: 10s
+    lambda: return id(daily_energy_kwh);
+    web_server:
+      sorting_group_id: group_energy
+      sorting_weight: 10
+    
+  - platform: template
+    name: "Weekly Energy"
+    id: weekly_energy
+    unit_of_measurement: "kWh"
+    icon: "mdi:counter"
+    accuracy_decimals: 2
+    update_interval: 10s
+    lambda: return id(weekly_energy_kwh);
+    web_server:
+      sorting_group_id: group_energy
+      sorting_weight: 11
+    
+  - platform: template
+    name: "Monthly Energy"
+    id: monthly_energy
+    unit_of_measurement: "kWh"
+    icon: "mdi:counter"
+    accuracy_decimals: 2
+    update_interval: 10s
+    lambda: return id(monthly_energy_kwh);
+    web_server:
+      sorting_group_id: group_energy
+      sorting_weight: 12
+    
+  - platform: template
+    name: "Daily Cost"
+    id: daily_cost
+    unit_of_measurement: "RUB"
+    icon: "mdi:currency-rub"
+    accuracy_decimals: 2
+    update_interval: 10s
+    lambda: return id(daily_energy_kwh) * id(tariff_rub).state;
+    web_server:
+      sorting_group_id: group_energy
+      sorting_weight: 20
+    
+  - platform: template
+    name: "Weekly Cost"
+    id: weekly_cost
+    unit_of_measurement: "RUB"
+    icon: "mdi:currency-rub"
+    accuracy_decimals: 2
+    update_interval: 10s
+    lambda: return id(weekly_energy_kwh) * id(tariff_rub).state;
+    web_server:
+      sorting_group_id: group_energy
+      sorting_weight: 21
+    
+  - platform: template
+    name: "Monthly Cost"
+    id: monthly_cost
+    unit_of_measurement: "RUB"
+    icon: "mdi:currency-rub"
+    accuracy_decimals: 2
+    update_interval: 10s
+    lambda: return id(monthly_energy_kwh) * id(tariff_rub).state;
+    web_server:
+      sorting_group_id: group_energy
+      sorting_weight: 22
+    
+  - platform: template
+    name: "Energy Cost (Total)"
+    id: energy_cost
+    unit_of_measurement: "RUB"
+    icon: "mdi:cash"
+    accuracy_decimals: 2
+    lambda: return id(total_energy).state * id(tariff_rub).state;
+    update_interval: 60s
+    web_server:
+      sorting_group_id: group_energy
+      sorting_weight: 23
+    
+  - platform: template
+    name: "Synced Meter Reading"
+    id: synced_meter_reading
+    unit_of_measurement: "kWh"
+    icon: "mdi:counter"
+    accuracy_decimals: 3
+    lambda: return id(total_energy).state + id(meter_offset_kwh);
+    update_interval: 10s
+    web_server:
+      sorting_group_id: group_energy
+      sorting_weight: 30
 
   # ---------- System sensors (group_system) ----------
   - platform: uptime
@@ -539,13 +707,29 @@ text_sensor:
     name: "Current Time"
     id: current_datetime
     icon: "mdi:clock"
-    update_interval: 1min
+    update_interval: 1s
     lambda: |-
       auto time = id(homeassistant_time).now();
       if (time.is_valid()) {
-        return time.strftime("%H:%M:%S %d.%m.%y");
+        const char* weekdays_full[] = {"Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"};
+        
+        // ESPHome: 1=Sunday, 2=Monday, 3=Tuesday, 4=Wednesday, 5=Thursday, 6=Friday, 7=Saturday
+        int weekday_num = time.day_of_week;
+        int ru_index;
+        if (weekday_num == 1) {
+          ru_index = 6;  // Воскресенье
+        } else {
+          ru_index = weekday_num - 2;  // ПН=0, ВТ=1, СР=2, ЧТ=3, ПТ=4, СБ=5
+        }
+        
+        char buffer[80];
+        snprintf(buffer, sizeof(buffer), "%s, %02d:%02d:%02d | %02d.%02d.%04d",
+                 weekdays_full[ru_index],
+                 time.hour, time.minute, time.second,
+                 time.day_of_month, time.month, time.year);
+        return std::string(buffer);
       } else {
-        return {"Waiting..."};
+        return {"🕐 Ожидание синхронизации времени..."};
       }
     entity_category: diagnostic
 
@@ -616,6 +800,20 @@ text_sensor:
       sorting_weight: 120
     lambda: |-
       return {"🆗No faults"};
+
+
+  - platform: template
+    name: "Current Tariff"
+    id: current_tariff_text
+    icon: "mdi:cash"
+    lambda: |-
+      char buffer[32];
+      snprintf(buffer, sizeof(buffer), "%.2f RUB/kWh", id(tariff_rub).state);
+      return std::string(buffer);
+    update_interval: 10s
+    web_server:
+      sorting_group_id: group_energy
+      sorting_weight: 1
 
 # ==================================================
 #                   SWITCHES
@@ -825,17 +1023,100 @@ button:
     #   sorting_group_id: group_system
     #   sorting_weight: 50
   
+
   - platform: template
-    name: "Reset Energy"
-    icon: "mdi:arrow-u-right-bottom-bold"
+    name: "Reset Total Energy"
+    icon: "mdi:lock-reset"
     on_press:
       then:
-        - lambda: |-
-            id(tuya_client)->set_boolean_datapoint_value(12, true);
+        - uart.write: [0xF8, 0x42, 0x00, 0x00]
+        - delay: 200ms
+        - uart.write: [0x01, 0x42, 0xC3, 0x7E]
     web_server:
       sorting_group_id: group_energy
       sorting_weight: 21
 
+
+  # - platform: template
+  #   name: "Reset Energy"
+  #   icon: "mdi:arrow-u-right-bottom-bold"
+  #   on_press:
+  #     then:
+  #       - lambda: |-
+  #           id(tuya_client)->set_boolean_datapoint_value(12, true);
+  #   web_server:
+  #     sorting_group_id: group_energy
+  #     sorting_weight: 21
+
+   # ========== КНОПКИ УПРАВЛЕНИЯ УЧЕТОМ (group_energy) ==========
+  - platform: template
+    name: "Reset Daily Energy"
+    icon: "mdi:autorenew"
+    entity_category: "config"
+    web_server:
+      sorting_group_id: group_energy
+      sorting_weight: 50
+    on_press:
+      - globals.set:
+          id: daily_energy_kwh
+          value: '0.0'
+          
+  - platform: template
+    name: "Reset Weekly Energy"
+    icon: "mdi:autorenew"
+    entity_category: "config"
+    web_server:
+      sorting_group_id: group_energy
+      sorting_weight: 51
+    on_press:
+      - globals.set:
+          id: weekly_energy_kwh
+          value: '0.0'
+          
+  - platform: template
+    name: "Reset Monthly Energy"
+    icon: "mdi:autorenew"
+    entity_category: "config"
+    web_server:
+      sorting_group_id: group_energy
+      sorting_weight: 52
+    on_press:
+      - globals.set:
+          id: monthly_energy_kwh
+          value: '0.0'
+          
+  - platform: template
+    name: "Reset All Energy Stats"
+    icon: "mdi:delete-sweep"
+    entity_category: "config"
+    web_server:
+      sorting_group_id: group_energy
+      sorting_weight: 53
+    on_press:
+      - globals.set:
+          id: daily_energy_kwh
+          value: '0.0'
+      - globals.set:
+          id: weekly_energy_kwh
+          value: '0.0'
+      - globals.set:
+          id: monthly_energy_kwh
+          value: '0.0'
+          
+  - platform: template
+    name: "Sync with External Meter"
+    icon: "mdi:sync"
+    entity_category: "config"
+    web_server:
+      sorting_group_id: group_energy
+      sorting_weight: 54
+    on_press:
+      then:
+        - lambda: |-
+            float sinotimer_energy = id(total_energy).state;
+            float meter_value = id(meter_reading).state;
+            float new_offset = meter_value - sinotimer_energy;
+            id(meter_offset_kwh) = new_offset;
 # ==================================================
 #                      SELECT
 # ==================================================
@@ -991,6 +1272,46 @@ number:
             id(tuya_client)->set_raw_datapoint_value(18, data);
 
 
+
+  - platform: template
+    name: "Tariff Rate"
+    id: tariff_rub
+    unit_of_measurement: "RUB/kWh"
+    icon: "mdi:cash"
+    min_value: 1.0
+    max_value: 20.0
+    step: 0.01
+    mode: box
+    optimistic: true
+    initial_value: $electricity_tariff
+    restore_value: true
+    entity_category: config
+    web_server:
+      sorting_group_id: group_energy
+      sorting_weight: 40
+    
+  - platform: template
+    name: "Meter Reading (External)"
+    id: meter_reading
+    unit_of_measurement: "kWh"
+    icon: "mdi:counter"
+    min_value: 0.0
+    max_value: 999999.9
+    step: 0.001
+    mode: box
+    optimistic: true
+    initial_value: '0.0'
+    restore_value: true
+    entity_category: config
+    web_server:
+      sorting_group_id: group_energy
+      sorting_weight: 31
+    set_action:
+      then:
+        - lambda: |-
+            float sinotimer_energy = id(total_energy).state;
+            float new_offset = x - sinotimer_energy;
+            id(meter_offset_kwh) = new_offset;
 
   # ---------- Other number settings ----------
   - platform: tuya
