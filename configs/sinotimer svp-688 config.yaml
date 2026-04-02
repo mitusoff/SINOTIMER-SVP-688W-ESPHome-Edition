@@ -100,7 +100,7 @@ wifi:
   min_auth_mode: WPA2
   ap:
     ssid: "${friendly_name} Hotspot"
-    password: "T3YvuZbeBY"
+    password: $ap_password
     ap_timeout: 60s
 
 # -------------------- UART for Tuya --------------------
