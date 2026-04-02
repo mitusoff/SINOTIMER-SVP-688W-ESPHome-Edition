@@ -23,7 +23,7 @@
 ### **Умный автоматический выключатель, который говорит на языке Home Assistant**
 
 
-[![ESPHome](https://img.shields.io/badge/ESPHome-2024.12.0-000000?logo=esphome&style=flat-square)](https://esphome.io)
+[![ESPHome](https://img.shields.io/badge/ESPHome-2026.1.5-000000?logo=esphome&style=flat-square)](https://esphome.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![ESP8266](https://img.shields.io/badge/ESP8266-12E-blue?style=flat-square)](https://www.espressif.com)
 
@@ -37,8 +37,8 @@
 
 Изначально SINOTIMER SVP-688W работал на штатной прошивке **Tuya**. С ней было два больших недостатка:
 
-- 🔌 **Нестабильность** — устройство периодически теряло соединение и требовало ручного переподключения
-- 📦 **Ограниченность** — большинство датапоинтов (DP) были скрыты или не использовались, настройка защит минимальна
+- 🔌 **Нестабильность** — устройство периодически теряло соединение и требовало ручного переподключения, через личный кабинет smarthome
+- 📦 **Ограниченность** — базовый функционал был бедноват, тем более кривая локализация, непонятно какие функции за что отвечают.
 
 **🔥 Я решил проблему кардинально:** полностью заменил прошивку на **ESPHome**.
 
