@@ -1057,7 +1057,7 @@ button:
   #     sorting_group_id: group_energy
   #     sorting_weight: 21
 
-   # ========== КНОПКИ УПРАВЛЕНИЯ УЧЕТОМ (group_energy) ==========
+   # ========== ENERGY METERING CONTROL BUTTONS ==========
   - platform: template
     name: "Reset Daily Energy"
     icon: "mdi:autorenew"
