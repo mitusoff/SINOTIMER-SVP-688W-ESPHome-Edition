@@ -1,25 +1,25 @@
 
+
 <div align="center">
+  <img src="assets/images/background.png" alt="SINOTIMER SVP-688W" width="600" style="border-radius: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.15);">
   
-# ⚡ SINOTIMER SVP-688W
-## Smart Circuit Breaker - ESPHome Edition 
-
-</div>
-
----
-
-
-
-<div align="center">
-
-### **Умный автоматический выключатель, который говорит на языке Home Assistant**
-
-
+  <h1>SINOTIMER SVP-688W</h1>
+  <h3>⚡ ESPHome Edition · Smart Circuit Breaker</h3>
+  
+  <p>
+    <code>63A</code> · <code>230V</code> · <code>ESP8266</code> · <code>Home Assistant</code>
+  </p>
+  
 [![ESPHome](https://img.shields.io/badge/ESPHome-2026.1.5-000000?logo=esphome&style=flat-square)](https://esphome.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![ESP8266](https://img.shields.io/badge/ESP8266-12E-blue?style=flat-square)](https://www.espressif.com)
 
+  ---
+  
+  *Полный контроль над вашей электросетью из Home Assistant · Локально · Без облака · Бесплатно*
+  
 </div>
+
 
 ---
 
